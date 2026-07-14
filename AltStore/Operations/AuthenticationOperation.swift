@@ -710,7 +710,11 @@ final class AuthenticationOperation: ResultOperation<(ALTTeam, ALTCertificate?, 
             throw OperationError.unknownUDID
         }
         
-        let devices = try await ALTAppleAPI.shared.fetchDevices(for: team, types: [.iphone, .ipad], session: session)
+        // Include `.vision` so an already-registered Apple Vision Pro is matched
+        // by UDID instead of triggering a redundant (and possibly rejected)
+        // re-registration. New devices still register under the iOS platform,
+        // which covers iPad-compatible sideloads on visionOS.
+        let devices = try await ALTAppleAPI.shared.fetchDevices(for: team, types: [.iphone, .ipad, .vision], session: session)
         if let device = devices.first(where: { $0.identifier == udid }) {
             return device
         } else {
