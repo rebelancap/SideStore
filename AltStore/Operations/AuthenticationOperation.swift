@@ -711,14 +711,22 @@ final class AuthenticationOperation: ResultOperation<(ALTTeam, ALTCertificate?, 
         }
         
         // Include `.vision` so an already-registered Apple Vision Pro is matched
-        // by UDID instead of triggering a redundant (and possibly rejected)
-        // re-registration. New devices still register under the iOS platform,
-        // which covers iPad-compatible sideloads on visionOS.
+        // by UDID instead of triggering a redundant re-registration.
         let devices = try await ALTAppleAPI.shared.fetchDevices(for: team, types: [.iphone, .ipad, .vision], session: session)
         if let device = devices.first(where: { $0.identifier == udid }) {
             return device
-        } else {
+        }
+
+        do {
             return try await ALTAppleAPI.shared.registerDevice(name: UIDevice.current.name, identifier: udid, type: .iphone, team: team, session: session)
+        } catch let error as NSError where error.domain == ALTAppleAPIErrorDomain
+            && error.code == ALTAppleAPIError.deviceAlreadyRegistered.rawValue {
+            // The device is already registered to this team but wasn't returned by
+            // `ios/listDevices` — this happens when it was registered under Apple's
+            // separate visionOS device platform (e.g. a prior Xcode install of a
+            // Vision Pro). That is exactly the state we need, so treat it as success
+            // instead of failing authentication with "device already registered".
+            return ALTDevice(name: UIDevice.current.name, identifier: udid, type: .vision)
         }
     }
     
