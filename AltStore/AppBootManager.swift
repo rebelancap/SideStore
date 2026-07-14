@@ -20,6 +20,18 @@ public final class AppBootManager {
     
     public nonisolated func getSavedPairingFile() -> String? {
         let fm = FileManager.default
+
+        // Prefer a RemotePairing file (rp_pairing_file.plist) produced by Wireless
+        // Pairing when present. On iOS-17+/visionOS the install and JIT services
+        // live behind the RSD tunnel, which requires an RP pairing; the classic
+        // lockdown ALTPairingFile can only reach basic services. Without this, a
+        // successful Wireless Pairing was written but never loaded on boot.
+        let rpPath = fm.documentsDirectory.appendingPathComponent("rp_pairing_file.plist")
+        if fm.fileExists(atPath: rpPath.path),
+           let contents = try? String(contentsOf: rpPath), !contents.isEmpty {
+            return contents
+        }
+
         let pairingFileName = "ALTPairingFile.mobiledevicepairing"
         let documentsPath = fm.documentsDirectory.appendingPathComponent(pairingFileName)
         if fm.fileExists(atPath: documentsPath.path),
